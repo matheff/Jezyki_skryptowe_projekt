@@ -32,8 +32,8 @@ class Product:
     def apply_discount(self, percent):
         if(percent < 0 or percent > 100):
             raise ValueError(f"Wrong percentage value: {percent}")
-        else:
-            return self.__unit_price * (1 - percent/100)
+        
+        return self.__unit_price * (1 - percent/100)
         
     def __str__(self):
         return (f"[{self.__product_id}] {self.__name} ({self.__category}) - {self.__unit_price} PLN")
