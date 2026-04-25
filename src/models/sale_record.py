@@ -32,7 +32,7 @@ class SaleRecord:
     @quantity.setter
     def quantity(self, quantity):
         if(quantity < 1):
-            raise ValueError(f"Wrong quantity value: {quantity}")
+            raise ValueError(f"Niepoprawna ilość: {quantity}")
         self.__quantity = quantity
 
     def total_price(self):

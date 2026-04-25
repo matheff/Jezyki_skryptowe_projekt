@@ -133,7 +133,7 @@ class ConsoleApp:
 
         elif choice == "3":
             start = input("Od (DD.MM.RRRR): ")
-            end = input("Do DD.MM.RRRR: ")
+            end = input("Do (DD.MM.RRRR): ")
 
             start = datetime.datetime.strptime(start, "%d.%m.%Y").date()
             end = datetime.datetime.strptime(end, "%d.%m.%Y").date()

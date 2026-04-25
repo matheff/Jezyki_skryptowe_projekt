@@ -62,7 +62,7 @@ class FileProcessor:
                                 parts = line.split("|")
 
                                 if len(parts) != 5:
-                                    errors.append(f"Linia {line_number}: zły format")
+                                    errors.append(f"Linia {line_number}: brakujące pole")
                                     continue
 
                                 date, product_id, quantity, seller, region_code = parts
@@ -77,15 +77,20 @@ class FileProcessor:
 
                                 if (region_code not in ["WA", "KR", "GD", "PO", "WR", 
                                                         "LO", "RZ", "BY", "ZG", "OP"]):
-                                    errors.append(f"Linia {line_number}: niepoprawny kod regionu")
+                                    errors.append(f"Linia {line_number}: nieprawidłowy kod regionu")
                                     continue
 
                                 if (product_id not in products):
-                                    errors.append(f"Linia {line_number}: brak produktu")
+                                    errors.append(f"Linia {line_number}: nieistniejący product_id")
                                     continue
 
                                 product = products[product_id]
-                                date = datetime.datetime.strptime(date.strip(), "%d.%m.%Y").date()
+
+                                try:
+                                    date = datetime.datetime.strptime(date.strip(), "%d.%m.%Y").date()
+                                except:
+                                    errors.append(f"Linia {line_number}: niezgodny format daty")
+                                    continue
 
                                 try:
                                     record = SaleRecord(
@@ -101,7 +106,7 @@ class FileProcessor:
 
                                 transactions.append(record)
         except PermissionError:    
-            raise PermissionError("Permission Error: file is not readable")
+            raise PermissionError("Permission Error: plik jest nie do oczytu")
 
         return { 
                     "dataset": dataset,

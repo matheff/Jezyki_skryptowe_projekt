@@ -12,7 +12,7 @@ class SaleStatistic:
 
     def average_revenue(self):
         if(len(self.dataset) == 0):
-            raise ValueError(f"There are no records")
+            raise ValueError(f"Nie ma rekordów")
         else:
             return self.total_revenue() / len(self.dataset)
         

@@ -25,13 +25,13 @@ class Product:
     @unit_price.setter
     def unit_price(self, price):
         if(price <= 0):
-            raise ValueError(f"Wrong price value: {price}")
+            raise ValueError(f"Niepoprawna cena: {price}")
         
         self.__unit_price = price
 
     def apply_discount(self, percent):
         if(percent < 0 or percent > 100):
-            raise ValueError(f"Wrong percentage value: {percent}")
+            raise ValueError(f"Niepoprawny wynik procentów: {percent}")
         
         return self.__unit_price * (1 - percent/100)
         
