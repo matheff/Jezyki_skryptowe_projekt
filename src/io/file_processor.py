@@ -26,6 +26,10 @@ class FileProcessor:
                     line = line.strip()
 
                     if line:
+
+                        if line == "---":
+                            continue
+
                         if (line.startswith('#')):
                             if (line == "#DATASET"):
                                 section = "DATASET"

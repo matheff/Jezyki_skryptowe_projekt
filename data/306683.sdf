@@ -3,12 +3,14 @@ owner: Mateusz Dąbrowski
 index: 306683
 created: 03.04.2026
 currency: PLN
+---
 
 #PRODUCTS
 P001|Nike|Buty|200
 P002|Adidas|Bluza|150
 P003|Puma|T-shirt|70
 P004|Vans|Buty|170
+---
 
 #TRANSACTIONS
 01.01.2026|P001|2|Anna|WA
@@ -44,8 +46,15 @@ P004|Vans|Buty|170
 17.03.2026|P001|3|Anna|ZG
 19.03.2026|P002|2|Jan|OP
 
+21.03.2026|P001|2|Anna|WA
+22.03.2026|P002|1|Jan|KR
+23.03.2026|P003|3|Piotr|GD
+24.03.2026|P004|1|Kasia|PO
+25.03.2026|P001|2|Anna|WR
+
 33.03.2026|P001|2|Anna|WA
 01.03.2026|P999|1|Jan|KR
 05.03.2026|P003|-1|Piotr|GD
 07.03.2026|P002|abc|Kasia|PO
 09.03.2026|P004|1|Anna|XX
+---
