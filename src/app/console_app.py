@@ -4,7 +4,7 @@ import json
 from src.io.file_processor import FileProcessor
 from src.models.sale_record import SaleRecord
 from src.models.sales_dataset import SalesDataset
-from src.analysis.statistics import SaleStatistic
+from src.analysis.statistics import SaleStatistics
 from src.models.product import Product
 
 
@@ -86,7 +86,7 @@ class ConsoleApp:
         if not self.check_sales_dataset():
             return
 
-        stats = SaleStatistic(self.sales_dataset)
+        stats = SaleStatistics(self.sales_dataset)
 
         total = stats.total_revenue()
         avg = stats.average_revenue()
@@ -152,7 +152,7 @@ class ConsoleApp:
         for f in filtered:
             print(f)
 
-        stats = SaleStatistic(filtered)
+        stats = SaleStatistics(filtered)
         print(f"\nPrzychód: {self.pln(stats.total_revenue())}")
         print(f"\nLiczba transakcji: {len(filtered)}")
         print(f"\nŚredni przychód: {self.pln(stats.average_revenue())}")
@@ -162,7 +162,7 @@ class ConsoleApp:
         if not self.check_sales_dataset():
             return
         
-        stats = SaleStatistic(self.sales_dataset)
+        stats = SaleStatistics(self.sales_dataset)
 
         now = datetime.datetime.now()
         timestamp = now.strftime("%Y-%m-%d_%H%M%S")
@@ -207,13 +207,13 @@ class ConsoleApp:
         if not self.check_sales_dataset():
             return
         
-        stats = SaleStatistic(self.sales_dataset)
+        stats = SaleStatistics(self.sales_dataset)
 
         now = datetime.datetime.now()
         timestamp = now.strftime("%Y-%m-%d_%H%M%S")
 
         index = self.dataset.get("index", "no_index")
-        filename = f"{index}_raport_{timestamp}.json"
+        filename = f"{index}_export_{timestamp}.json"
 
         path = os.path.join(self.reports_dir, filename)
 
@@ -232,7 +232,7 @@ class ConsoleApp:
             "revenue_by_region": stats.revenue_by_region_code(),
             "revenue_by_month": stats.revenue_by_date(),
             "top_products": [
-                {"product": key, "revenue": self.pln(value)} for key, value in stats.top_revenue_by_product()
+                {"product": key, "revenue": value} for key, value in stats.top_revenue_by_product()
             ]
         }
 

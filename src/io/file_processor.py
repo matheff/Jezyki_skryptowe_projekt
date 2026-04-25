@@ -57,7 +57,10 @@ class FileProcessor:
                             product_id = parts[0].strip()
                             name = parts[1].strip()
                             category = parts[2].strip()
-                            price = float(parts[3])
+                            try:
+                                price = float(parts[3])
+                            except ValueError:
+                                raise SdfParseError(f"Linia {line_number}: niepoprawna cena")
 
                             products[product_id] = Product(
                                                             product_id, 
@@ -124,4 +127,4 @@ class FileProcessor:
                 }
                 
 class SdfParseError(Exception):
-    pass
+    pass 

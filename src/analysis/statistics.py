@@ -1,6 +1,6 @@
 from datetime import datetime
 
-class SaleStatistic:
+class SaleStatistics:
     def __init__(self, dataset):
         self.dataset = dataset
 
