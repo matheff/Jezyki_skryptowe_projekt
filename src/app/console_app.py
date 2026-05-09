@@ -6,11 +6,13 @@ from src.models.sale_record import SaleRecord
 from src.models.sales_dataset import SalesDataset
 from src.analysis.statistics import SaleStatistics
 from src.models.product import Product
+from src.io.raport_generator import RaportGenerator
 
 
 class ConsoleApp:
-    def __init__(self, reports_dir="data/reports"):
-        self.reports_dir   = reports_dir
+    def __init__(self, raports_dir="data/raports"):
+        self.raports_dir   = raports_dir
+        self.raport_generator = RaportGenerator(self.raports_dir)
         self.dataset       = None
         self.sales_dataset = None
         self.products      = None
@@ -148,6 +150,10 @@ class ConsoleApp:
             print("Zła kategoria")
             return
         
+        if len(filtered) == 0:
+            print("Brak wyników")
+            return
+        
         print("Wynik:")
         for f in filtered:
             print(f)
@@ -161,93 +167,18 @@ class ConsoleApp:
     def generate_txt_report(self):
         if not self.check_sales_dataset():
             return
-        
-        stats = SaleStatistics(self.sales_dataset)
 
-        now = datetime.datetime.now()
-        timestamp = now.strftime("%Y-%m-%d_%H%M%S")
+        path = self.raport_generator.generate_txt(self.dataset, self.sales_dataset)
 
-        index = self.dataset.get("index", "no_index")
-        filename = f"{index}_raport_{timestamp}.txt"
-
-        path = os.path.join(self.reports_dir, filename)
-
-        os.makedirs(self.reports_dir, exist_ok=True)
-
-        with open(path, "w", encoding="utf-8") as f:
-            f.write("DATASET:\n")
-            for key, value in self.dataset.items():
-                f.write(f"{key}: {value}\n")
-            
-            f.write("\nSTATYSTYKI:\n")
-            total = stats.total_revenue()
-            avg = stats.average_revenue()
-
-            f.write(f"Przychód: {self.pln(total)}\n")
-            f.write(f"Liczba transakcji: {len(self.sales_dataset)}\n")
-            f.write(f"Średnia: {self.pln(avg)}\n")
-            f.write(f"Top sprzedawca: {stats.top_seller()}\n")
-            f.write(f"Top miesiąc: {stats.top_month()}\n")
-
-            f.write("\nPRZYCHÓD MIESIĘCZNY:\n")
-            for key, value in stats.revenue_by_date().items():
-                f.write(f"{key}: {self.pln(value)}\n")
-
-            f.write("\nRANKING SPRZEDAWCÓW:\n")
-            for key, value in stats.revenue_by_seller().items():
-                f.write(f"{key}: {self.pln(value)}\n")
-
-            f.write("\nRANKING REGIONÓW:\n")
-            for key, value in stats.revenue_by_region_code().items():
-                f.write(f"{key}: {self.pln(value)}\n")
-            
-            print(f"\nRaport zapisany na ściezce: {path}")
+        print(f"\nRaport zapisany na ścieżce: {path}")
 
     def export_json(self):
         if not self.check_sales_dataset():
             return
-        
-        stats = SaleStatistics(self.sales_dataset)
 
-        now = datetime.datetime.now()
-        timestamp = now.strftime("%Y-%m-%d_%H%M%S")
+        path = self.raport_generator.generate_json(self.dataset, self.sales_dataset)
 
-        index = self.dataset.get("index", "no_index")
-        filename = f"{index}_export_{timestamp}.json"
-
-        path = os.path.join(self.reports_dir, filename)
-
-        os.makedirs(self.reports_dir, exist_ok=True)
-
-        total = stats.total_revenue()
-        avg = stats.average_revenue()
-
-        statistics = {
-            "total_revenue": total,
-            "average_revenue": avg,
-            "transactions_count": len(self.sales_dataset),
-            "top_seller": stats.top_seller(),
-            "top_month": stats.top_month(),
-            "revenue_by_category": stats.revenue_by_category(),
-            "revenue_by_region": stats.revenue_by_region_code(),
-            "revenue_by_month": stats.revenue_by_date(),
-            "top_products": [
-                {"product": key, "revenue": value} for key, value in stats.top_revenue_by_product()
-            ]
-        }
-
-        transactions = [record.to_dict() for record in self.sales_dataset]
-
-        data = {
-            "dataset": self.dataset,
-            "statistics": statistics,
-            "transactions": transactions
-        }
-
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
-        
-        print(f"\nJson zapisany na ściezce: {path}")
+        print(f"\nJSON zapisany na ścieżce: {path}")
 
     def show_info(self):
         if not self.check_sales_dataset():
@@ -270,6 +201,10 @@ class ConsoleApp:
     def check_sales_dataset(self):
         if not self.sales_dataset:
             print("Najpierw wczytaj dane")
+            return False
+        
+        if len(self.sales_dataset) == 0:
+            print("Brak danych do statystyk")
             return False
         return True
     

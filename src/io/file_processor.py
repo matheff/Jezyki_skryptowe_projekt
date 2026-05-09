@@ -1,5 +1,4 @@
 from pathlib import Path
-import os
 from src.models.sale_record import SaleRecord
 from src.models.product import Product
 import datetime
@@ -86,11 +85,6 @@ class FileProcessor:
                                 errors.append(f"Linia {line_number}: zły typ danych")
                                 continue
 
-                            if (region_code not in ["WA", "KR", "GD", "PO", "WR", 
-                                                    "LO", "RZ", "BY", "ZG", "OP"]):
-                                errors.append(f"Linia {line_number}: nieprawidłowy kod regionu")
-                                continue
-
                             if (product_id not in products):
                                 errors.append(f"Linia {line_number}: nieistniejący product_id")
                                 continue
@@ -99,7 +93,7 @@ class FileProcessor:
 
                             try:
                                 date = datetime.datetime.strptime(date.strip(), "%d.%m.%Y").date()
-                            except:
+                            except ValueError:
                                 errors.append(f"Linia {line_number}: niezgodny format daty")
                                 continue
 
@@ -116,6 +110,8 @@ class FileProcessor:
                                 continue
 
                             transactions.append(record)
+                if index != 3:
+                    raise SdfParseError("Brak wymaganych sekcji")
         except PermissionError:    
             raise PermissionError("Permission Error: plik jest nie do oczytu")
 

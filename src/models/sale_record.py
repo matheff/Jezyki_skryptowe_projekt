@@ -2,7 +2,15 @@ import datetime
 from src.models.product import Product
 
 class SaleRecord:
+    allowed_regions = {"WA", "KR", "GD", "PO", "WR", "LO", "RZ", "BY", "ZG", "OP"}
+
     def __init__(self, product, quantity, date, seller, region_code):
+        if not seller.strip():
+            raise ValueError("Pusty sprzedawca")
+        
+        if region_code not in self.allowed_regions:
+            raise ValueError(f"Niepoprawny kod regionu: {region_code}")
+
         self.__product      = product
         self.quantity       = quantity
         self.__date         = date
