@@ -1,7 +1,7 @@
 import datetime
 import os
 import json
-from src.io.file_processor import FileProcessor
+from src.io.file_processor import FileProcessor, SdfParseError
 from src.models.sale_record import SaleRecord
 from src.models.sales_dataset import SalesDataset
 from src.analysis.statistics import SaleStatistics
@@ -67,22 +67,26 @@ class ConsoleApp:
         path = input("Enter path to sdf file: ")
 
         fp = FileProcessor()
-        data = fp.parse_sdf(path)
+        try:
+            self.dataset, self.sales_dataset, self.products, self.errors = fp.parse_sdf(path)
 
-        self.dataset = data["dataset"]
-        self.sales_dataset = SalesDataset(data["transactions"])
-        self.products = data["products"]
-        self.errors = data["errors"]
+            print(f"\nWczytano: {len(self.sales_dataset)}")
+            print(f"Błędy: {len(self.errors)}")
 
-        print(f"\nWczytano: {len(data['transactions'])}")
-        print(f"Błędy: {len(self.errors)}")
+            if self.errors:
+                for err in self.errors[:10]:
+                    print(err)
 
-        if self.errors:
-            for err in self.errors[:10]:
-                print(err)
-
-            if len(self.errors) > 10:
-                print(f" i {len(self.errors) - 10} więcej")
+                if len(self.errors) > 10:
+                    print(f" i {len(self.errors) - 10} więcej")
+        except FileNotFoundError:
+            print("Błąd: Plik nie istnieje.")
+        except PermissionError:
+            print("Błąd: Brak uprawnień do odczytu pliku.")
+        except SdfParseError as e:
+            print(f"Błąd parsowania SDF: {e}")
+        except Exception as e:
+            print(f"Nieoczekiwany błąd: {e}")
 
     def show_statistics(self):
         if not self.check_sales_dataset():
@@ -125,29 +129,43 @@ class ConsoleApp:
         
         choice = input("Wybór: ")
 
-        if choice == "1":
-            value = input("Kategoria: ")
-            filtered = self.sales_dataset.filter_by_category(value)
+        try:
+            if choice == "1":
+                value = input("Kategoria: ")
+                filtered = self.sales_dataset.filter_by_category(value)
 
-        elif choice == "2":
-            value = input("Sprzedawca: ")
-            filtered = self.sales_dataset.filter_by_seller(value)
+            elif choice == "2":
+                value = input("Sprzedawca: ")
+                filtered = self.sales_dataset.filter_by_seller(value)
 
-        elif choice == "3":
-            start = input("Od (DD.MM.RRRR): ")
-            end = input("Do (DD.MM.RRRR): ")
+            elif choice == "3":
+                start = input("Od (DD.MM.RRRR): ")
+                end = input("Do (DD.MM.RRRR): ")
 
-            start = datetime.datetime.strptime(start, "%d.%m.%Y").date()
-            end = datetime.datetime.strptime(end, "%d.%m.%Y").date()
+                start = datetime.datetime.strptime(start, "%d.%m.%Y").date()
+                end = datetime.datetime.strptime(end, "%d.%m.%Y").date()
 
-            filtered = self.sales_dataset.filter_by_date_range(start, end)
+                if start > end:
+                        print("Błąd: Data 'Od' nie może być późniejsza niż data 'Do'.")
+                        return
 
-        elif choice == "4":
-            value = input("Kod regionu: ")
-            filtered = self.sales_dataset.filter_by_region(value)
+                filtered = self.sales_dataset.filter_by_date_range(start, end)
 
-        else:
-            print("Zła kategoria")
+            elif choice == "4":
+                value = input("Kod regionu: ")
+                filtered = self.sales_dataset.filter_by_region(value)
+
+            else:
+                print("Zła kategoria")
+                return
+        
+        except ValueError:
+            print("Błąd: Niepoprawny format daty!")
+            print("Użyj formatu: DD.MM.RRRR (np. 15.03.2025)")
+            return
+        
+        except Exception as e:
+            print(f"Nieoczekiwany błąd: {e}")
             return
         
         if len(filtered) == 0:

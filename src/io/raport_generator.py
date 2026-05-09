@@ -30,6 +30,22 @@ class RaportGenerator:
             f.write(f"Top sprzedawca: {stats.top_seller()}\n")
             f.write(f"Top miesiąc: {stats.top_month()}\n")
 
+            f.write("\nKategorie:\n")
+            for key, value in stats.revenue_by_category().items():
+                f.write(f"{key}: {value} PLN\n")
+
+            f.write("\nRegiony:\n")
+            for key, value in stats.revenue_by_region_code().items():
+                 f.write(f"{key}: {value} PLN\n")
+
+            f.write("\nTop produkty:\n")
+            for key, value in stats.top_revenue_by_product():
+                 f.write(f"{key}: {value} PLN\n")
+
+            f.write("\nZestawienie miesięczne:\n")
+            for key, value in stats.revenue_by_date().items():
+                f.write(f"{key}: {value:.2f} PLN\n")
+
         return path
 
     def generate_json(self, dataset, sales_dataset):

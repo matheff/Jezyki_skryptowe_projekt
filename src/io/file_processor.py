@@ -1,15 +1,18 @@
 from pathlib import Path
 from src.models.sale_record import SaleRecord
 from src.models.product import Product
+from src.models.sales_dataset import SalesDataset
 import datetime
 
+class SdfParseError(Exception):
+    pass 
 
 class FileProcessor:
     def parse_sdf(self, path):
         sdf_file_path = Path(path)
 
         if not sdf_file_path.exists():
-            raise FileNotFoundError
+            raise FileNotFoundError(f"Plik nie istnieje: {path}")
         
         dataset = {}
         products = {}
@@ -115,12 +118,6 @@ class FileProcessor:
         except PermissionError:    
             raise PermissionError("Permission Error: plik jest nie do oczytu")
 
-        return { 
-                    "dataset": dataset,
-                    "products": products,
-                    "transactions": transactions,
-                    "errors": errors
-                }
+        return dataset, SalesDataset(transactions), products, errors
                 
-class SdfParseError(Exception):
-    pass 
+
