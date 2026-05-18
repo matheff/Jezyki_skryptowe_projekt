@@ -19,42 +19,92 @@ class FileProcessor:
         transactions = []
         errors = []
 
-        section = ""
+        section = None
         line_number = 0
 
         try:
             with open(path, "r", encoding="utf-8") as f:
-                expected_order = ["DATASET", "PRODUCTS", "TRANSACTIONS"]
+                expected_order = ["#DATASET", "#PRODUCTS", "#TRANSACTIONS"]
                 index = 0
                 for line in f:
                     line_number += 1
                     line = line.strip()
 
                     if line:
+
                         if (line == "---"):
                             continue
 
                         if line.startswith("#"):
-                            new_section = line[1:]
+                            if line in expected_order:
+                                new_section = line
 
-                            if new_section != expected_order[index]:
-                                raise SdfParseError(f"Linia {line_number}: oczekiwano {expected_order[index]}, a jest {new_section}")
+                                if index >= len(expected_order):
+                                    raise SdfParseError(
+                                        f"Linia {line_number}: zbyt wiele sekcji"
+                                    )
 
-                            section = new_section
-                            index += 1
-                            continue
+                                if new_section != expected_order[index]:
+                                    raise SdfParseError(f"Linia {line_number}: oczekiwano {expected_order[index]}, a jest {new_section}")
+
+                                section = new_section
+                                index += 1
+                                continue
+                            else:
+                                continue
+
+                        if not section:
+                            raise SdfParseError(
+                                f"Linia {line_number}: dane poza sekcją"
+                            )
                         
-                        if (section == "DATASET"):
+                        if (section == "#DATASET"):
+                            if ":" not in line:
+                                raise SdfParseError(
+                                    f"Linia {line_number}: niepoprawny format DATASET"
+                                )
+                            
                             key, value = line.split(":", 1)
+
+                            key = key.strip()
+                            value = value.strip()
+
+                            if not value:
+                                raise SdfParseError(
+                                    f"Linia {line_number}: pusta wartość pola {key}"
+                                )
+                            
+                            if key in dataset:
+                                raise SdfParseError(
+                                    f"Linia {line_number}: duplikat pola {key}"
+                                )
+
                             if (key in ["owner", "index", "created", "currency"]):
-                                dataset[key.strip()] = value.strip()
+                                if key.strip() == "created":
+                                    try:
+                                        datetime.datetime.strptime(
+                                            value,
+                                            "%d.%m.%Y"
+                                        )
+                                    except ValueError:
+                                        raise SdfParseError(
+                                            f"Linia {line_number}: niepoprawna data created"
+                                        )
+                                    
+                                if key == "currency" and value != "PLN":
+                                    raise SdfParseError(
+                                        f"Linia {line_number}: nieobsługiwana waluta"
+                                    )
+
+                                dataset[key] = value
+                            
                             else:
                                 raise SdfParseError(f"Linia {line_number}: Błąd w sekcji #DATASET")
 
-                        elif (section == "PRODUCTS"):
+                        elif (section == "#PRODUCTS"):
                             parts = line.split("|")
                             if len(parts) != 4:
-                                raise SdfParseError(f"Linia {line_number}: Błąd w skecji #PRODUCTS")
+                                raise SdfParseError(f"Linia {line_number}: Błąd w sekcji #PRODUCTS")
                             
                             product_id = parts[0].strip()
                             name = parts[1].strip()
@@ -63,15 +113,28 @@ class FileProcessor:
                                 price = float(parts[3])
                             except ValueError:
                                 raise SdfParseError(f"Linia {line_number}: niepoprawna cena")
-
-                            products[product_id] = Product(
+                            
+                            if product_id in products:
+                                raise SdfParseError(
+                                    f"Linia {line_number}: duplikat product_id"
+                                )
+                            
+                            try:
+                                product = Product(
                                                             product_id, 
                                                             name, 
                                                             category, 
                                                             price
                                                             )
+                            except ValueError as e:
+                                raise SdfParseError(
+                                    f"Linia {line_number}: {e}"
+                                )
                             
-                        elif (section == "TRANSACTIONS"):
+                            products[product_id] = product
+
+
+                        elif (section == "#TRANSACTIONS"):
                             parts = line.split("|")
 
                             if len(parts) != 5:
@@ -85,7 +148,7 @@ class FileProcessor:
                             try:
                                 quantity = int(quantity)
                             except ValueError:
-                                errors.append(f"Linia {line_number}: zły typ danych")
+                                errors.append(f"Linia {line_number}: niepoprawna ilość")
                                 continue
 
                             if (product_id not in products):
@@ -113,8 +176,17 @@ class FileProcessor:
                                 continue
 
                             transactions.append(record)
-                if index != 3:
+                if index != len(expected_order):
                     raise SdfParseError("Brak wymaganych sekcji")
+                
+                required = {"owner", "index", "created", "currency"}
+
+                missing = required - dataset.keys()
+
+                if missing:
+                    raise SdfParseError(
+                        f"Brak pól DATASET: {', '.join(missing)}"
+                    )
         except PermissionError:    
             raise PermissionError("Permission Error: plik jest nie do oczytu")
 
