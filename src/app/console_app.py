@@ -145,11 +145,11 @@ class ConsoleApp:
                 start = datetime.datetime.strptime(start, "%d.%m.%Y").date()
                 end = datetime.datetime.strptime(end, "%d.%m.%Y").date()
 
-                if start > end:
-                        print("Błąd: Data 'Od' nie może być późniejsza niż data 'Do'.")
-                        return
-
-                filtered = self.sales_dataset.filter_by_date_range(start, end)
+                try:
+                    filtered = self.sales_dataset.filter_by_date_range(start, end)
+                except ValueError as e:
+                    print(f"Błąd: {e}")
+                    return
 
             elif choice == "4":
                 value = input("Kod regionu: ")
