@@ -30,21 +30,10 @@ class RaportGenerator:
             f.write(f"Top sprzedawca: {stats.top_seller()}\n")
             f.write(f"Top miesiąc: {stats.top_month()}\n")
 
-            f.write("\nKategorie:\n")
-            for key, value in stats.revenue_by_category().items():
-                f.write(f"{key}: {value} PLN\n")
-
-            f.write("\nRegiony:\n")
-            for key, value in stats.revenue_by_region_code().items():
-                 f.write(f"{key}: {value} PLN\n")
-
-            f.write("\nTop produkty:\n")
-            for key, value in stats.top_revenue_by_product():
-                 f.write(f"{key}: {value} PLN\n")
-
-            f.write("\nZestawienie miesięczne:\n")
-            for key, value in stats.revenue_by_date().items():
-                f.write(f"{key}: {value:.2f} PLN\n")
+            self.write_dataset(f, "Kategorie", stats.revenue_by_category())
+            self.write_dataset(f, "Regiony", stats.revenue_by_region_code())
+            self.write_dataset(f, "Top produkty", stats.top_revenue_by_product())
+            self.write_dataset(f, "Zestawieniemiesięczne", stats.revenue_by_date())
 
         return path
 
@@ -81,3 +70,14 @@ class RaportGenerator:
             json.dump(data, f, indent=2, ensure_ascii=False)
 
         return path
+    
+    def write_dataset(self, f, name, dataset):
+        f.write(f"\n{name}:\n")
+
+        if isinstance(dataset, dict):
+            items = dataset.items()
+        else:
+            items = dataset
+
+        for k, v in items:
+            f.write(f"{k}: {v}\n")
