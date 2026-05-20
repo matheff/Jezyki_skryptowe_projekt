@@ -67,3 +67,9 @@ class SaleStatistics:
     def top_month(self):
         month = self.revenue_by_date()
         return max(month, key=month.get)
+    
+    def transaction_count(self):
+        count = 0
+        for i in self.dataset:
+            count += 1
+        return count
