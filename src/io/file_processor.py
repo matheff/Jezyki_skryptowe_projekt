@@ -3,6 +3,19 @@ from src.models.sale_record import SaleRecord
 from src.models.product import Product
 from src.models.sales_dataset import SalesDataset
 import datetime
+import re
+
+RE_SEPARATOR = re.compile(r"^---$")
+RE_HEADER_FIELD = re.compile(r"^(?P<key>[a-z]+):\s(?P<value>.+)$", re.IGNORECASE)
+RE_DATE = re.compile(r"^(?P<day>\d{2})\.(?P<month>\d{2})\.(?P<year>\d{4})$")
+RE_PRODUCT_LINE = re.compile(r"^(?P<id>[a-z\d]{4})\|(?P<name>[^|]+)\|(?P<category>[^|]+)\|(?P<price>\d+(?:\.\d{1,2})?)$", re.IGNORECASE)
+RE_TRANSACTION_LINE = re.compile(r"""^
+                                    (?P<date>\d{2}\.\d{2}\.\d{4})\|
+                                    (?P<pid>[a-z\d]+)\|
+                                    (?P<qty>\d+)\|
+                                    (?P<seller>[a-z\d]+)\|
+                                    (?P<region>[A-Z]{2})
+                                $""", re.VERBOSE | re.IGNORECASE)
 
 class SdfParseError(Exception):
     pass 
@@ -13,7 +26,7 @@ class FileProcessor:
 
         if not sdf_file_path.exists():
             raise FileNotFoundError(f"Plik nie istnieje: {path}")
-        
+
         dataset = {}
         products = {}
         transactions = []
@@ -32,7 +45,7 @@ class FileProcessor:
 
                     if line:
 
-                        if (line == "---"):
+                        if RE_SEPARATOR.match(line):
                             continue
 
                         if line.startswith("#"):
@@ -59,15 +72,13 @@ class FileProcessor:
                             )
                         
                         if (section == "#DATASET"):
-                            if ":" not in line:
+                            match_header = RE_HEADER_FIELD.match(line)
+                            if not match_header:
                                 raise SdfParseError(
                                     f"Linia {line_number}: niepoprawny format DATASET"
                                 )
-                            
-                            key, value = line.split(":", 1)
-
-                            key = key.strip()
-                            value = value.strip()
+                            key = match_header.group("key")
+                            value = match_header.group("value")
 
                             if not value:
                                 raise SdfParseError(
@@ -80,13 +91,9 @@ class FileProcessor:
                                 )
 
                             if (key in ["owner", "index", "created", "currency"]):
-                                if key.strip() == "created":
-                                    try:
-                                        datetime.datetime.strptime(
-                                            value,
-                                            "%d.%m.%Y"
-                                        )
-                                    except ValueError:
+                                if key == "created":
+                                    
+                                    if not self.validate_date(value):
                                         raise SdfParseError(
                                             f"Linia {line_number}: niepoprawna data created"
                                         )
@@ -102,15 +109,17 @@ class FileProcessor:
                                 raise SdfParseError(f"Linia {line_number}: Błąd w sekcji #DATASET")
 
                         elif (section == "#PRODUCTS"):
-                            parts = line.split("|")
-                            if len(parts) != 4:
-                                raise SdfParseError(f"Linia {line_number}: Błąd w sekcji #PRODUCTS")
+                            match_product = RE_PRODUCT_LINE.match(line)
+                            if not match_product:
+                                raise SdfParseError(
+                                    f"Linia {line_number}: Błąd w sekcji #PRODUCTS"
+                                )
                             
-                            product_id = parts[0].strip()
-                            name = parts[1].strip()
-                            category = parts[2].strip()
+                            product_id = match_product.group("id")
+                            name = match_product.group("name")
+                            category = match_product.group("category")
                             try:
-                                price = float(parts[3])
+                                price = float(match_product.group("price"))
                             except ValueError:
                                 raise SdfParseError(f"Linia {line_number}: niepoprawna cena")
                             
@@ -135,18 +144,20 @@ class FileProcessor:
 
 
                         elif (section == "#TRANSACTIONS"):
-                            parts = line.split("|")
-
-                            if len(parts) != 5:
+                            match_transaction = RE_TRANSACTION_LINE.match(line)
+                            if not match_transaction:
                                 errors.append(f"Linia {line_number}: brakujące pole")
                                 continue
 
-                            date, product_id, quantity, seller, region_code = parts
+                            date = match_transaction.group("date")
+                            product_id = match_transaction.group("pid")
+                            seller = match_transaction.group("seller")
+                            region_code = match_transaction.group("region")
 
                             product_id = product_id.strip()
 
                             try:
-                                quantity = int(quantity)
+                                quantity = int(match_transaction.group("qty"))
                             except ValueError:
                                 errors.append(f"Linia {line_number}: niepoprawna ilość")
                                 continue
@@ -156,18 +167,17 @@ class FileProcessor:
                                 continue
 
                             product = products[product_id]
-
-                            try:
-                                date = datetime.datetime.strptime(date.strip(), "%d.%m.%Y").date()
-                            except ValueError:
-                                errors.append(f"Linia {line_number}: niezgodny format daty")
+                            
+                            validated_date = self.validate_date(date)
+                            if not validated_date:
+                                errors.append (f"Linia {line_number}: niezgodny format daty")
                                 continue
 
                             try:
                                 record = SaleRecord(
                                                     product,
                                                     quantity,
-                                                    date,
+                                                    validated_date,
                                                     seller,
                                                     region_code
                                                     )
@@ -191,5 +201,31 @@ class FileProcessor:
             raise PermissionError("Permission Error: plik jest nie do oczytu")
 
         return dataset, SalesDataset(transactions), products, errors
-                
+    
+    def validate_date(self, date_str):
+        match_date = RE_DATE.match(date_str)
 
+        if not match_date:
+            return None
+
+        day = int(match_date.group("day"))
+        month = int(match_date.group("month"))
+        year = int(match_date.group("year"))
+
+        if not (1 <= day <= 31):
+            return None
+
+        if not (1 <= month <= 12):
+            return None
+
+        if not (1000 <= year <= 9999):
+            return None
+
+        try:
+            return datetime.datetime.strptime(
+                date_str,
+                "%d.%m.%Y"
+            ).date()
+
+        except ValueError:
+            return None
