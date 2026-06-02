@@ -6,14 +6,15 @@ import datetime
 import re
 
 RE_SEPARATOR = re.compile(r"^---$")
-RE_HEADER_FIELD = re.compile(r"^(?P<key>[a-z]+):\s(?P<value>.+)$", re.IGNORECASE)
+RE_HEADER_FIELD = re.compile(r"^(?P<key>[a-z]+):\s*(?P<value>.*)$", re.IGNORECASE)
+RE_SECTION = re.compile(r"^(?P<section>#DATASET|#PRODUCTS|#TRANSACTIONS)$")
 RE_DATE = re.compile(r"^(?P<day>\d{2})\.(?P<month>\d{2})\.(?P<year>\d{4})$")
-RE_PRODUCT_LINE = re.compile(r"^(?P<id>[a-z\d]{4})\|(?P<name>[^|]+)\|(?P<category>[^|]+)\|(?P<price>\d+(?:\.\d{1,2})?)$", re.IGNORECASE)
+RE_PRODUCT_LINE = re.compile(r"^(?P<id>[A-Za-z0-9]{4,10})\|(?P<name>[^|]+)\|(?P<category>[^|]+)\|(?P<price>\d+(?:\.\d{1,2})?)$", re.IGNORECASE)
 RE_TRANSACTION_LINE = re.compile(r"""^
                                     (?P<date>\d{2}\.\d{2}\.\d{4})\|
-                                    (?P<pid>[a-z\d]+)\|
-                                    (?P<qty>\d+)\|
-                                    (?P<seller>[a-z\d]+)\|
+                                    (?P<pid>[A-Za-z0-9]{4,10})\|
+                                    (?P<qty>-?\d+)\| #Minus jest po to aby przy ujemnych wartościach nie zwracało błędu o niepoprawnym formacie, lecz o niepoprawnej ilości
+                                    (?P<seller>[^|]+)\|
                                     (?P<region>[A-Z]{2})
                                 $""", re.VERBOSE | re.IGNORECASE)
 
@@ -43,149 +44,169 @@ class FileProcessor:
                     line_number += 1
                     line = line.strip()
 
-                    if line:
+                    if not line:
+                        continue
 
-                        if RE_SEPARATOR.match(line):
-                            continue
+                    if RE_SEPARATOR.match(line):
+                        continue
 
-                        if line.startswith("#"):
-                            if line in expected_order:
-                                new_section = line
+                    section_match = RE_SECTION.match(line)
 
-                                if index >= len(expected_order):
-                                    raise SdfParseError(
-                                        f"Linia {line_number}: zbyt wiele sekcji"
-                                    )
+                    if section_match:
+                        new_section = section_match.group("section")
 
-                                if new_section != expected_order[index]:
-                                    raise SdfParseError(f"Linia {line_number}: oczekiwano {expected_order[index]}, a jest {new_section}")
-
-                                section = new_section
-                                index += 1
-                                continue
-                            else:
-                                continue
-
-                        if not section:
+                        if index >= len(expected_order):
                             raise SdfParseError(
-                                f"Linia {line_number}: dane poza sekcją"
+                                f"Linia {line_number}: zbyt wiele sekcji"
+                            )
+
+                        if new_section != expected_order[index]:
+                            raise SdfParseError(f"Linia {line_number}: oczekiwano {expected_order[index]}, a jest {new_section}")
+
+                        section = new_section
+                        index += 1
+                        continue
+
+                    if not section:
+                        raise SdfParseError(
+                            f"Linia {line_number}: dane poza sekcją"
+                        )
+                    
+                    if (section == "#DATASET"):
+                        match_header = RE_HEADER_FIELD.match(line)
+                        if not match_header:
+                            raise SdfParseError(
+                                f"Linia {line_number}: niepoprawny format DATASET"
+                            )
+                        key = match_header.group("key")
+                        value = match_header.group("value")
+
+                        if not value.strip():
+                            raise SdfParseError(
+                                f"Linia {line_number}: pusta wartość pola {key}"
                             )
                         
-                        if (section == "#DATASET"):
-                            match_header = RE_HEADER_FIELD.match(line)
-                            if not match_header:
-                                raise SdfParseError(
-                                    f"Linia {line_number}: niepoprawny format DATASET"
-                                )
-                            key = match_header.group("key")
-                            value = match_header.group("value")
+                        if key in dataset:
+                            raise SdfParseError(
+                                f"Linia {line_number}: duplikat pola {key}"
+                            )
 
-                            if not value:
-                                raise SdfParseError(
-                                    f"Linia {line_number}: pusta wartość pola {key}"
-                                )
-                            
-                            if key in dataset:
-                                raise SdfParseError(
-                                    f"Linia {line_number}: duplikat pola {key}"
-                                )
-
-                            if (key in ["owner", "index", "created", "currency"]):
-                                if key == "created":
-                                    
-                                    if not self.validate_date(value):
-                                        raise SdfParseError(
-                                            f"Linia {line_number}: niepoprawna data created"
-                                        )
-                                    
-                                if key == "currency" and value != "PLN":
+                        if (key in ["owner", "index", "created", "currency"]):
+                            if key == "created":
+                                if not self.validate_date(value):
                                     raise SdfParseError(
-                                        f"Linia {line_number}: nieobsługiwana waluta"
+                                        f"Linia {line_number}: niepoprawna data created"
                                     )
-
-                                dataset[key] = value
-                            
-                            else:
-                                raise SdfParseError(f"Linia {line_number}: Błąd w sekcji #DATASET")
-
-                        elif (section == "#PRODUCTS"):
-                            match_product = RE_PRODUCT_LINE.match(line)
-                            if not match_product:
+                                
+                            if key == "currency" and value.strip().upper() != "PLN":
                                 raise SdfParseError(
-                                    f"Linia {line_number}: Błąd w sekcji #PRODUCTS"
+                                    f"Linia {line_number}: nieobsługiwana waluta"
                                 )
+
+                            dataset[key] = value
+                        
+                        else:
+                            raise SdfParseError(f"Linia {line_number}: Błąd w sekcji #DATASET")
+
+                    elif (section == "#PRODUCTS"):
+                        match_product = RE_PRODUCT_LINE.match(line)
+                        if not match_product:
+                            raise SdfParseError(
+                                f"Linia {line_number}: Błąd w sekcji #PRODUCTS"
+                            )
+                        
+                        product_id = match_product.group("id")
+                        name = match_product.group("name")
+                        category = match_product.group("category")
+                        try:
+                            price = float(match_product.group("price"))
+                        except ValueError:
+                            raise SdfParseError(f"Linia {line_number}: niepoprawna cena")
+                        
+                        if product_id in products:
+                            raise SdfParseError(
+                                f"Linia {line_number}: duplikat product_id"
+                            )
+                        
+                        try:
+                            product = Product(
+                                                        product_id, 
+                                                        name, 
+                                                        category, 
+                                                        price
+                                                        )
+                        except ValueError as e:
+                            raise SdfParseError(
+                                f"Linia {line_number}: {e}"
+                            )
+                        
+                        products[product_id] = product
+
+                    elif (section == "#TRANSACTIONS"):
+                        parts = line.split("|")
+                        if len(parts) < 5:
+                            errors.append(f"Linia {line_number}: brakujące pole")
+                            continue
+                        elif len(parts) >5:
+                            errors.append(f"Linia {line_number}: zbyt wiele pól")
+                            continue
+                        
+                        match_transaction = RE_TRANSACTION_LINE.match(line)
+                        if not match_transaction:
+                            errors.append(f"Linia {line_number}: niepoprawny format transakcji")
+                            continue
+
+                        date = match_transaction.group("date")
+                        product_id = match_transaction.group("pid")
+                        seller = match_transaction.group("seller")
+                        region_code = match_transaction.group("region")
+
+                        product_id = product_id.strip()
+
+                        try:
+                            quantity = int(match_transaction.group("qty"))
+                        except ValueError:
+                            errors.append(f"Linia {line_number}: niepoprawna ilość")
+                            continue
+
+                        if quantity < 1:
+                            errors.append(f"Linia {line_number}: ujemna ilość")
+                            continue
                             
-                            product_id = match_product.group("id")
-                            name = match_product.group("name")
-                            category = match_product.group("category")
-                            try:
-                                price = float(match_product.group("price"))
-                            except ValueError:
-                                raise SdfParseError(f"Linia {line_number}: niepoprawna cena")
-                            
-                            if product_id in products:
-                                raise SdfParseError(
-                                    f"Linia {line_number}: duplikat product_id"
-                                )
-                            
-                            try:
-                                product = Product(
-                                                            product_id, 
-                                                            name, 
-                                                            category, 
-                                                            price
-                                                            )
-                            except ValueError as e:
-                                raise SdfParseError(
-                                    f"Linia {line_number}: {e}"
-                                )
-                            
-                            products[product_id] = product
+                        if (product_id not in products):
+                            errors.append(f"Linia {line_number}: nieistniejący product_id")
+                            continue
 
+                        product = products[product_id]
 
-                        elif (section == "#TRANSACTIONS"):
-                            match_transaction = RE_TRANSACTION_LINE.match(line)
-                            if not match_transaction:
-                                errors.append(f"Linia {line_number}: brakujące pole")
-                                continue
+                        if not seller.strip():
+                            errors.append(f"Linia {line_number}: pusty sprzedawca")
+                            continue
+                        
+                        validated_date = self.validate_date(date)
+                        if not validated_date:
+                            errors.append (f"Linia {line_number}: niezgodny format daty")
+                            continue
 
-                            date = match_transaction.group("date")
-                            product_id = match_transaction.group("pid")
-                            seller = match_transaction.group("seller")
-                            region_code = match_transaction.group("region")
+                        if region_code not in SaleRecord.allowed_regions:
+                            errors.append(
+                                f"Linia {line_number}: nieprawidłowy kod regionu"
+                            )
+                            continue
 
-                            product_id = product_id.strip()
+                        try:
+                            record = SaleRecord(
+                                                product,
+                                                quantity,
+                                                validated_date,
+                                                seller,
+                                                region_code
+                                                )
+                        except ValueError as e:
+                            errors.append(f"Linia {line_number}: {e}")
+                            continue
 
-                            try:
-                                quantity = int(match_transaction.group("qty"))
-                            except ValueError:
-                                errors.append(f"Linia {line_number}: niepoprawna ilość")
-                                continue
-
-                            if (product_id not in products):
-                                errors.append(f"Linia {line_number}: nieistniejący product_id")
-                                continue
-
-                            product = products[product_id]
-                            
-                            validated_date = self.validate_date(date)
-                            if not validated_date:
-                                errors.append (f"Linia {line_number}: niezgodny format daty")
-                                continue
-
-                            try:
-                                record = SaleRecord(
-                                                    product,
-                                                    quantity,
-                                                    validated_date,
-                                                    seller,
-                                                    region_code
-                                                    )
-                            except ValueError as e:
-                                errors.append(f"Linia {line_number}: {e}")
-                                continue
-
-                            transactions.append(record)
+                        transactions.append(record)
                 if index != len(expected_order):
                     raise SdfParseError("Brak wymaganych sekcji")
                 
