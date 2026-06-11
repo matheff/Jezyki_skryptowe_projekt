@@ -2,6 +2,7 @@ import os
 import json
 import datetime
 from src.analysis.statistics import SaleStatistics
+from src.io.excel_exporter import ExcelExporter
 
 class RaportGenerator:
     def __init__(self, reports_dir):
@@ -70,7 +71,22 @@ class RaportGenerator:
             json.dump(data, f, indent=2, ensure_ascii=False)
 
         return path
-    
+
+    def generate_excel(self, dataset, sales_dataset):
+        stats = SaleStatistics(sales_dataset)
+
+        now = datetime.datetime.now()
+        timestamp = now.strftime("%Y-%m-%d_%H%M%S")
+
+        index = dataset.get("index", "no_index")
+        filename = f"{index}_excel_{timestamp}.xlsx"
+        path = os.path.join(self.reports_dir, filename)
+
+        exporter = ExcelExporter()
+        exporter.export(sales_dataset, stats, path)
+
+        return path
+
     def write_dataset(self, f, name, dataset):
         f.write(f"\n{name}:\n")
 

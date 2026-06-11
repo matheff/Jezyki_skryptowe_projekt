@@ -7,6 +7,8 @@ from src.models.sales_dataset import SalesDataset
 from src.analysis.statistics import SaleStatistics
 from src.models.product import Product
 from src.io.raport_generator import RaportGenerator
+from src.io.excel_exporter import ExcelExporter
+from src.db.database import SalesDatabase
 
 
 class ConsoleApp:
@@ -17,6 +19,7 @@ class ConsoleApp:
         self.sales_dataset = None
         self.products      = None
         self.errors        = None
+        self.db            = SalesDatabase()
 
     def run(self):
         while True:
@@ -33,9 +36,13 @@ class ConsoleApp:
                 elif choice == "4":
                     self.generate_txt_report()
                 elif choice == "5":
-                    self.export_json()
+                    self.generate_export_json()
                 elif choice == "6":
                     self.show_info()
+                elif choice == "7":
+                    self.generate_export_excel()
+                elif choice == "8":
+                    self.database_option()
                 elif choice == "0":
                     break
                 else:
@@ -59,6 +66,8 @@ class ConsoleApp:
                 4. Raport TXT
                 5. Eksport JSON
                 6. Informacje o zbiorze
+                7. Eksport Excel
+                8. Baza danych
                 0. Wyjście
                 """
               )
@@ -113,7 +122,7 @@ class ConsoleApp:
             print(f"{key}: {self.pln(value)} {self.convert_to_percent(value, total)}")
 
         print("\nTop produkty:")
-        for key, value in stats.top_revenue_by_product():
+        for key, value in stats.top_revenue_by_product().items():
             print(f"{key}: {self.pln(value)}")
 
     def filter_menu(self):
@@ -190,13 +199,31 @@ class ConsoleApp:
 
         print(f"\nRaport zapisany na ścieżce: {path}")
 
-    def export_json(self):
+    def generate_export_json(self):
         if not self.check_sales_dataset():
             return
 
         path = self.raport_generator.generate_json(self.dataset, self.sales_dataset)
 
         print(f"\nJSON zapisany na ścieżce: {path}")
+    
+    def generate_export_excel(self):
+        if not self.check_sales_dataset():
+            return
+
+        try:
+            path = self.raport_generator.generate_excel(
+                self.dataset,
+                self.sales_dataset
+            )
+
+            print(f"\nExcel zapisany na ścieżce: {path}")
+
+        except ImportError as e:
+            print(e)
+
+        except IOError as e:
+            print(e)
 
     def show_info(self):
         if not self.check_sales_dataset():
@@ -215,6 +242,118 @@ class ConsoleApp:
         start, end = self.sales_dataset.get_date_range()
 
         print(f"Zakres dat: {start.strftime('%d.%m.%Y')} - {end.strftime('%d.%m.%Y')}")
+
+    def database_option(self):
+        hostname = 'localhost'
+        database = 'skryptowe'
+        username = 'postgres'
+        pwd = '123'
+        port_id = 5432
+
+        if self.db.is_connected():
+            print(f"[połączono: {hostname}/{database}]")
+        else:
+            print("[brak połączenia]")
+
+        while(True):
+            print(
+                        """
+                        a) Połącz z bazą
+                        b) Utwórz schemat
+                        c) Importuj dane
+                        d) Zapytania analityczne
+                        e) Usuń schemat
+                        0) Powrót.
+                        """
+                )
+            
+            choice = input("Wybierz opcję: ")
+            try:
+                if choice == "a":
+                    self.db.connect(hostname, port_id, database, username, pwd)
+
+                    if self.db.is_connected():
+                        print("[OK] Połączono z bazą")
+                    else:
+                        print("[ERROR] Brak połączenia")
+                elif choice == "b":
+                    if not self.db.is_connected():
+                        print("Najpierw połącz z bazą")
+                        continue
+
+                    self.db.create_schema()
+                    print("Schema utworzona")
+                elif choice == "c":
+                    if not self.db.is_connected():
+                        print("Najpierw połącz z bazą")
+                        continue
+
+                    dataset = {
+                                    "products": [
+                                        {
+                                            "product_id": p.product_id,
+                                            "name": p.name,
+                                            "category": p.category,
+                                            "unit_price": p.unit_price
+                                        }
+                                        for p in self.products.values()
+                                    ],
+                                    "transactions": [
+                                        {
+                                            "date": t.date,
+                                            "product_id": t.product.product_id,
+                                            "quantity": t.quantity,
+                                            "seller": t.seller,
+                                            "region_code": t.region_code,
+                                            "total_value": t.total_price()
+                                        }
+                                        for t in self.sales_dataset
+                                    ]
+                                }
+
+                    inserted = self.db.import_dataset(dataset)
+                    print(f"Zaimportowano {inserted} transakcji")
+                elif choice == "d":
+                    if not self.db.is_connected():
+                        print("Najpierw połącz z bazą")
+                        continue
+
+                    print( 
+                            """
+                            1) Przychód wg kategorii
+                            2) Top 5 sprzedawców
+                            3) Podsumowanie miesięczne
+                            4) Liczba transakcji w bazie
+                            0) Powrót.
+                            """
+                        )
+                    choice_query = input("Wybierz opcję: ")
+                    if choice_query == "1":
+                        for category, revenue in self.db.get_revenue_by_category():
+                            print(f"{category}: {self.pln(revenue)}")
+                    elif choice_query == "2":
+                        print(self.db.get_top_sellers())
+                    elif choice_query == "3":
+                        print(self.db.get_monthly_summary())
+                    elif choice_query == "4":
+                        print(self.db.get_transaction_count())
+                    elif choice_query == "0":
+                        continue
+                        
+                elif choice == "e":
+                    if not self.db.is_connected():
+                        print("Najpierw połącz z bazą")
+                        continue
+
+                    self.db.drop_schema()
+                    print("Schema usunięta")
+                elif choice == "0":
+                    self.db.disconnect()
+                    break
+                else:
+                    print("Nieprawidłowa opcja")
+            except Exception as e:
+                print(f"Błąd: {e}")
 
     def check_sales_dataset(self):
         if not self.sales_dataset:

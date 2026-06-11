@@ -56,9 +56,9 @@ class SaleStatistics:
             
             result[key] += revenue
 
-        sorted_items = sorted(result.items(), key=lambda item: item[1], reverse=True)
+        sorted_items = sorted(result.items(), key=lambda item: item[1], reverse=True)[:n]
 
-        return sorted_items[:n]
+        return dict(sorted_items)
 
     def top_seller(self):
         seller = self.revenue_by_seller()
