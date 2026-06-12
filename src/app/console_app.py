@@ -12,7 +12,7 @@ from src.db.database import SalesDatabase
 
 
 class ConsoleApp:
-    def __init__(self, raports_dir="data/raports"):
+    def __init__(self, raports_dir="data/reports"):
         self.raports_dir      = raports_dir
         self.raport_generator = RaportGenerator(self.raports_dir)
         self.dataset          = None
@@ -120,7 +120,7 @@ class ConsoleApp:
         self.stats_printer(stats.revenue_by_region_code().items())
 
         print("\nTop produkty:")
-        self.stats_printer(stats.revenue_by_region_code().items())
+        self.stats_printer(stats.top_revenue_by_product().items())
 
     def filter_menu(self):
         if not self.check_sales_dataset():
@@ -247,12 +247,12 @@ class ConsoleApp:
         pwd = '123'
         port_id = 5432
 
-        if self.db.is_connected():
-            print(f"[połączono: {hostname}/{database}]")
-        else:
-            print("[brak połączenia]")
-
         while(True):
+            if self.db.is_connected():
+                print(f"[połączono: {hostname}/{database}]")
+            else:
+                print("[brak połączenia]")
+
             print(
                         """
                         a) Połącz z bazą
@@ -279,10 +279,14 @@ class ConsoleApp:
                         continue
 
                     self.db.create_schema()
-                    print("Schema utworzona")
+                    print("Schemat utworzony")
                 elif choice == "c":
                     if not self.db.is_connected():
                         print("Najpierw połącz z bazą")
+                        continue
+
+                    if self.products is None:
+                        print("Najpierw wczytaj dane")
                         continue
 
                     dataset = {
@@ -340,9 +344,13 @@ class ConsoleApp:
                     if not self.db.is_connected():
                         print("Najpierw połącz z bazą")
                         continue
-
-                    self.db.drop_schema()
-                    print("Schema usunięta")
+                    
+                    confirm = input("Napewno chcesz usunąć schemat? (wpisz tak)\n")
+                    if confirm.lower() == "tak":
+                        self.db.drop_schema()
+                        print("Schemat usunięty")
+                    else: 
+                        print("Schemat nie został usunięty")
                 elif choice == "0":
                     self.db.disconnect()
                     break
@@ -374,4 +382,4 @@ class ConsoleApp:
             items = dataset
 
         for k, v in items:
-            print(f" {k}: {v}")
+            print(f" {k}: {self.pln(v)}")

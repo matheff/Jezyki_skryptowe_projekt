@@ -1,8 +1,7 @@
-import psycopg2
-
-
-# conn = None
-# cur = None
+try:
+    import psycopg2
+except ImportError:
+    psycopg2 = None
 
 class DatabaseError(Exception):
     pass
@@ -14,9 +13,7 @@ class SalesDatabase:
 
     def connect(self, host, port, dbname, user, password):
         try:
-            try:
-                import psycopg2
-            except ImportError:
+            if psycopg2 is None:
                 raise ImportError(
                     "Pakiet psycopg2 nie jest zainstalowany. "
                     "Zainstaluj go poleceniem: pip install psycopg2-binary"
@@ -34,7 +31,7 @@ class SalesDatabase:
 
         except ImportError:
             raise
-        except Exception as e:
+        except psycopg2.Error as e:
             raise DatabaseError(str(e))
 
     def disconnect(self):
@@ -65,7 +62,7 @@ class SalesDatabase:
             self.cur.execute("""
                                 CREATE TABLE IF NOT EXISTS transactions (
                                     id SERIAL PRIMARY KEY,
-                                    date DATE NOT NULL,
+                                    sale_date DATE NOT NULL,
                                     product_id VARCHAR(10) NOT NULL
                                         REFERENCES products(product_id),
                                     quantity INTEGER NOT NULL
@@ -78,7 +75,7 @@ class SalesDatabase:
 
             self.conn.commit()
 
-        except Exception as e:
+        except psycopg2.Error as e:
             self.conn.rollback()
             raise DatabaseError(str(e))
 
@@ -89,7 +86,7 @@ class SalesDatabase:
 
             self.conn.commit()
 
-        except Exception as e:
+        except psycopg2.Error as e:
             self.conn.rollback()
             raise DatabaseError(str(e))
 
@@ -126,7 +123,7 @@ class SalesDatabase:
 
             self.cur.executemany("""
                                     INSERT INTO transactions
-                                    (date, product_id, quantity,
+                                    (sale_date, product_id, quantity,
                                     seller, region_code, total_value)
                                     VALUES (%s, %s, %s, %s, %s, %s)
                                 """, transactions)
@@ -135,7 +132,7 @@ class SalesDatabase:
 
             return len(transactions)
 
-        except Exception as e:
+        except psycopg2.Error as e:
             self.conn.rollback()
             raise DatabaseError(str(e))
 
@@ -157,9 +154,9 @@ class SalesDatabase:
                 for row in self.cur.fetchall()
             ]
 
-        except Exception as e:
+        except psycopg2.Error as e:
             self.conn.rollback()
-            raise DatabaseError(str(e))
+            raise DatabaseError("Najpierw utwórz schemat (opcja b)")
 
     def get_top_sellers(self, n=5):
         try:
@@ -178,15 +175,15 @@ class SalesDatabase:
                 for row in self.cur.fetchall()
             ]
 
-        except Exception as e:
+        except psycopg2.Error as e:
             self.conn.rollback()
-            raise DatabaseError(str(e))
+            raise DatabaseError("Najpierw utwórz schemat (opcja b)")
 
     def get_monthly_summary(self):
         try:
             self.cur.execute("""
                                 SELECT
-                                    TO_CHAR(date, 'YYYY-MM') AS month,
+                                    TO_CHAR(sale_date, 'YYYY-MM') AS month,
                                     SUM(total_value) AS revenue
                                 FROM transactions
                                 GROUP BY month
@@ -198,9 +195,9 @@ class SalesDatabase:
                 for row in self.cur.fetchall()
             ]
 
-        except Exception as e:
+        except psycopg2.Error as e:
             self.conn.rollback()
-            raise DatabaseError(str(e))
+            raise DatabaseError("Najpierw utwórz schemat (opcja b)")
 
     def get_transaction_count(self) -> int:
         try:
@@ -211,6 +208,6 @@ class SalesDatabase:
 
             return self.cur.fetchone()[0]
 
-        except Exception as e:
+        except psycopg2.Error as e:
             self.conn.rollback()
             raise DatabaseError(str(e))
