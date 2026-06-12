@@ -13,13 +13,13 @@ from src.db.database import SalesDatabase
 
 class ConsoleApp:
     def __init__(self, raports_dir="data/raports"):
-        self.raports_dir   = raports_dir
+        self.raports_dir      = raports_dir
         self.raport_generator = RaportGenerator(self.raports_dir)
-        self.dataset       = None
-        self.sales_dataset = None
-        self.products      = None
-        self.errors        = None
-        self.db            = SalesDatabase()
+        self.dataset          = None
+        self.sales_dataset    = None
+        self.products         = None
+        self.errors           = None
+        self.db               = SalesDatabase()
 
     def run(self):
         while True:
@@ -114,16 +114,13 @@ class ConsoleApp:
         print(f"Top miesiąc: {stats.top_month()}")
 
         print("\nKategorie:")
-        for key, value in stats.revenue_by_category().items():
-            print(f"{key}: {self.pln(value)} {self.convert_to_percent(value, total)}")
+        self.stats_printer(stats.revenue_by_category().items())
 
         print("\nRegiony:")
-        for key, value in stats.revenue_by_region_code().items():
-            print(f"{key}: {self.pln(value)} {self.convert_to_percent(value, total)}")
+        self.stats_printer(stats.revenue_by_region_code().items())
 
         print("\nTop produkty:")
-        for key, value in stats.top_revenue_by_product().items():
-            print(f"{key}: {self.pln(value)}")
+        self.stats_printer(stats.revenue_by_region_code().items())
 
     def filter_menu(self):
         if not self.check_sales_dataset():
@@ -273,9 +270,9 @@ class ConsoleApp:
                     self.db.connect(hostname, port_id, database, username, pwd)
 
                     if self.db.is_connected():
-                        print("[OK] Połączono z bazą")
+                        print("Połączono z bazą")
                     else:
-                        print("[ERROR] Brak połączenia")
+                        print("Brak połączenia")
                 elif choice == "b":
                     if not self.db.is_connected():
                         print("Najpierw połącz z bazą")
@@ -326,17 +323,16 @@ class ConsoleApp:
                             4) Liczba transakcji w bazie
                             0) Powrót.
                             """
-                        )
+                         )
                     choice_query = input("Wybierz opcję: ")
                     if choice_query == "1":
-                        for category, revenue in self.db.get_revenue_by_category():
-                            print(f"{category}: {self.pln(revenue)}")
+                        self.stats_printer(self.db.get_revenue_by_category())
                     elif choice_query == "2":
-                        print(self.db.get_top_sellers())
+                        self.stats_printer(self.db.get_top_sellers())
                     elif choice_query == "3":
-                        print(self.db.get_monthly_summary())
+                        self.stats_printer(self.db.get_monthly_summary())
                     elif choice_query == "4":
-                        print(self.db.get_transaction_count())
+                        print(f"Liczba transakcji: {self.db.get_transaction_count()}")
                     elif choice_query == "0":
                         continue
                         
@@ -370,3 +366,12 @@ class ConsoleApp:
 
     def convert_to_percent(self, value, total):
         return f"{(value / total * 100):.1f}%" if total else "0.0%"
+    
+    def stats_printer(self, dataset):
+        if isinstance(dataset, dict):
+            items = dataset.items()
+        else:
+            items = dataset
+
+        for k, v in items:
+            print(f" {k}: {v}")

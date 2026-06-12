@@ -61,7 +61,7 @@ class RaportGenerator:
                 "revenue_by_month": stats.revenue_by_date(),
                 "top_products": [
                     {"product": k, "revenue": v}
-                    for k, v in stats.top_revenue_by_product()
+                    for k, v in stats.top_revenue_by_product().items()
                 ]
             },
             "transactions": [r.to_dict() for r in sales_dataset]
