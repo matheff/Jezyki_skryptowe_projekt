@@ -72,7 +72,7 @@ class RaportGenerator:
 
         return path
 
-    def generate_excel(self, dataset, sales_dataset):
+    def generate_excel(self, dataset, sales_dataset, products):
         stats = SaleStatistics(sales_dataset)
 
         now = datetime.datetime.now()
@@ -83,7 +83,7 @@ class RaportGenerator:
         path = os.path.join(self.reports_dir, filename)
 
         exporter = ExcelExporter()
-        exporter.export(sales_dataset, stats, path)
+        exporter.export(sales_dataset, stats, products, path)
 
         return path
 

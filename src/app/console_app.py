@@ -1,6 +1,7 @@
 import datetime
 import os
 import json
+import getpass
 from src.io.file_processor import FileProcessor, SdfParseError
 from src.models.sale_record import SaleRecord
 from src.models.sales_dataset import SalesDataset
@@ -211,7 +212,8 @@ class ConsoleApp:
         try:
             path = self.raport_generator.generate_excel(
                 self.dataset,
-                self.sales_dataset
+                self.sales_dataset,
+                self.products
             )
 
             print(f"\nExcel zapisany na ścieżce: {path}")
@@ -241,38 +243,30 @@ class ConsoleApp:
         print(f"Zakres dat: {start.strftime('%d.%m.%Y')} - {end.strftime('%d.%m.%Y')}")
 
     def database_option(self):
-        hostname = 'localhost'
-        database = 'skryptowe'
-        username = 'postgres'
-        pwd = '123'
-        port_id = 5432
-
         while(True):
             if self.db.is_connected():
-                print(f"[połączono: {hostname}/{database}]")
+                print(f"[połączono: {self.db.conn.info.host}/{self.db.conn.info.dbname}]")
             else:
                 print("[brak połączenia]")
 
-            print(
-                        """
-                        a) Połącz z bazą
-                        b) Utwórz schemat
-                        c) Importuj dane
-                        d) Zapytania analityczne
-                        e) Usuń schemat
-                        0) Powrót.
-                        """
-                )
+            self.show_database_menu()
             
             choice = input("Wybierz opcję: ")
             try:
                 if choice == "a":
-                    self.db.connect(hostname, port_id, database, username, pwd)
-
                     if self.db.is_connected():
-                        print("Połączono z bazą")
-                    else:
-                        print("Brak połączenia")
+                        print("Jesteś już połączony z bazą danych. Aby ją zmienić rozłącz się (opcja 0)")
+                        continue
+
+                    host = input("Host [domyślnie localhost]: ") or "localhost"
+                    port = int(input("Port [domyślnie 5432]: ") or "5432")
+                    dbname = input("Nazwa bazy [domyślnie skryptowe]: ") or "skryptowe"
+                    user = input("Użytkownik [domyślnie postgres]: ") or "postgres"
+                    password = getpass.getpass("Hasło: ") # dzięki getpass nie widać jak użytkownik wpisuje hasło w terminalu
+
+                    self.db.connect(host, port, dbname, user, password)
+
+                    print("\nPomyślnie połączono z bazą danych\n")
                 elif choice == "b":
                     if not self.db.is_connected():
                         print("Najpierw połącz z bazą")
@@ -284,62 +278,22 @@ class ConsoleApp:
                     if not self.db.is_connected():
                         print("Najpierw połącz z bazą")
                         continue
-
-                    if self.products is None:
-                        print("Najpierw wczytaj dane")
+                    if not self.sales_dataset or len(self.sales_dataset) == 0:
+                        print("Najpierw wczytaj plik SDF (opcja 1)")
                         continue
 
-                    dataset = {
-                                    "products": [
-                                        {
-                                            "product_id": p.product_id,
-                                            "name": p.name,
-                                            "category": p.category,
-                                            "unit_price": p.unit_price
-                                        }
-                                        for p in self.products.values()
-                                    ],
-                                    "transactions": [
-                                        {
-                                            "date": t.date,
-                                            "product_id": t.product.product_id,
-                                            "quantity": t.quantity,
-                                            "seller": t.seller,
-                                            "region_code": t.region_code,
-                                            "total_value": t.total_price()
-                                        }
-                                        for t in self.sales_dataset
-                                    ]
-                                }
-
-                    inserted = self.db.import_dataset(dataset)
+                    dataset_for_db = self.prepare_dataset_for_database(self.products, self.sales_dataset)
+                    inserted = self.db.import_dataset(dataset_for_db)
                     print(f"Zaimportowano {inserted} transakcji")
+
+
                 elif choice == "d":
                     if not self.db.is_connected():
                         print("Najpierw połącz z bazą")
                         continue
-
-                    print( 
-                            """
-                            1) Przychód wg kategorii
-                            2) Top 5 sprzedawców
-                            3) Podsumowanie miesięczne
-                            4) Liczba transakcji w bazie
-                            0) Powrót.
-                            """
-                         )
-                    choice_query = input("Wybierz opcję: ")
-                    if choice_query == "1":
-                        self.stats_printer(self.db.get_revenue_by_category())
-                    elif choice_query == "2":
-                        self.stats_printer(self.db.get_top_sellers())
-                    elif choice_query == "3":
-                        self.stats_printer(self.db.get_monthly_summary())
-                    elif choice_query == "4":
-                        print(f"Liczba transakcji: {self.db.get_transaction_count()}")
-                    elif choice_query == "0":
-                        continue
                         
+                    self.show_query_menu()
+
                 elif choice == "e":
                     if not self.db.is_connected():
                         print("Najpierw połącz z bazą")
@@ -358,6 +312,69 @@ class ConsoleApp:
                     print("Nieprawidłowa opcja")
             except Exception as e:
                 print(f"Błąd: {e}")
+        self.db.disconnect()
+
+    def prepare_dataset_for_database(self, product_dict, sales_dataset):
+        product_dict = product_dict or {}
+        sales_dataset = sales_dataset or []
+        
+        return {
+                "products": [
+                    {
+                        "product_id": p.product_id,
+                        "name": p.name,
+                        "category": p.category,
+                        "unit_price": float(p.unit_price)
+                    }
+                    for p in product_dict.values()
+                ],
+                "transactions": [
+                    {
+                        "date": str(t.date),
+                        "product_id": t.product.product_id,
+                        "quantity": t.quantity,
+                        "seller": t.seller,
+                        "region_code": t.region_code,
+                        "total_value": float(t.total_price())
+                    }
+                    for t in sales_dataset
+                ]
+            }
+
+    def show_database_menu(self):
+        print(
+                """
+                a) Połącz z bazą
+                b) Utwórz schemat
+                c) Importuj dane
+                d) Zapytania analityczne
+                e) Usuń schemat
+                0) Powrót.
+                """
+            )
+
+    def show_query_menu(self):
+        print( 
+                """
+                1) Przychód wg kategorii
+                2) Top 5 sprzedawców
+                3) Podsumowanie miesięczne
+                4) Liczba transakcji w bazie
+                0) Powrót.
+                """
+             )
+        
+        choice_query = input("Wybierz opcję: ")
+        if choice_query == "1":
+            self.stats_printer(self.db.get_revenue_by_category())
+        elif choice_query == "2":
+            self.stats_printer(self.db.get_top_sellers())
+        elif choice_query == "3":
+            self.stats_printer(self.db.get_monthly_summary())
+        elif choice_query == "4":
+            print(f"Liczba transakcji: {self.db.get_transaction_count()}")
+        elif choice_query == "0":
+            return
 
     def check_sales_dataset(self):
         if not self.sales_dataset:

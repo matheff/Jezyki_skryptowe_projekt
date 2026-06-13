@@ -2,7 +2,7 @@
 class ExcelExporter:
     CURRENCY_FORMAT = "#,##0.00"
 
-    def export(self, dataset, statistics, filepath: str) -> None:
+    def export(self, dataset, statistics, products, filepath: str) -> None:
         try:
             import openpyxl
         except ImportError:
@@ -15,7 +15,7 @@ class ExcelExporter:
 
             self.create_transaction_sheet(wb, dataset)
             self.create_statistics_sheet(wb, statistics)
-            self.create_product_sheet(wb, dataset)
+            self.create_product_sheet(wb, products)
 
             wb.save(filepath)
         except OSError as e:
@@ -84,21 +84,16 @@ class ExcelExporter:
 
         self.auto_size(sheetStatistics)
 
-    def create_product_sheet(self, wb, dataset):
+    def create_product_sheet(self, wb, products_dict):
         sheetProduct = wb.create_sheet("Produkty")
-
+        
         headers = ["ID", "Nazwa", "Kategoria", "Cena (PLN)"]
 
         sheetProduct.append(headers)
 
         self.style_header(sheetProduct)
 
-        products = {}
-
-        for r in dataset:
-            products[r.product.product_id] = r.product
-        
-        sorted_products = sorted(products.values(), key=lambda r: r.product_id)
+        sorted_products = sorted(products_dict.values(), key=lambda r: r.product_id)
 
         for p in sorted_products:
             sheetProduct.append([
@@ -118,7 +113,7 @@ class ExcelExporter:
             sheet.column_dimensions[column_cells[0].column_letter].width = length + 2
 
     def write_section_title(self, sheet, row, column, title):
-        cell = sheet.cell(row=row, column=column, value=title)
+        cell = sheet.cell(row=row, column=column, value=title) #to się i tak wykona bo w pythonie jest tak że jak jest równa się to wykonuje się to po prawej stronie, pobiera wynik i dopiero przypisuje się do zmiennej
         self.make_bold(cell, size=12)
         return row + 1
 
@@ -144,7 +139,7 @@ class ExcelExporter:
     
     def set_currency_format(self, sheet, columns, format):
         for col in columns:
-            for cell in sheet[col][1:]:
+            for cell in sheet[col][1:]: # [1:] Pominięcie wiersza nagłówkowego
                 cell.number_format = format
 
     def style_header(self, sheet):

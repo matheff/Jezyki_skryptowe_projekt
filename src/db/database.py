@@ -156,7 +156,11 @@ class SalesDatabase:
 
         except psycopg2.Error as e:
             self.conn.rollback()
-            raise DatabaseError("Najpierw utwórz schemat (opcja b)")
+            raise DatabaseError(
+                                f"Błąd bazy danych. "
+                                f"Upewnij się, że schemat został utworzony. "
+                                f"Szczegóły: {e}"
+                               )
 
     def get_top_sellers(self, n=5):
         try:
@@ -177,7 +181,11 @@ class SalesDatabase:
 
         except psycopg2.Error as e:
             self.conn.rollback()
-            raise DatabaseError("Najpierw utwórz schemat (opcja b)")
+            raise DatabaseError(
+                                f"Błąd bazy danych. "
+                                f"Upewnij się, że schemat został utworzony. "
+                                f"Szczegóły: {e}"
+                               )
 
     def get_monthly_summary(self):
         try:
@@ -197,7 +205,11 @@ class SalesDatabase:
 
         except psycopg2.Error as e:
             self.conn.rollback()
-            raise DatabaseError("Najpierw utwórz schemat (opcja b)")
+            raise DatabaseError(
+                                f"Błąd bazy danych. "
+                                f"Upewnij się, że schemat został utworzony. "
+                                f"Szczegóły: {e}"
+                               )
 
     def get_transaction_count(self) -> int:
         try:
@@ -210,4 +222,8 @@ class SalesDatabase:
 
         except psycopg2.Error as e:
             self.conn.rollback()
-            raise DatabaseError(str(e))
+            raise DatabaseError(
+                                f"Błąd bazy danych. "
+                                f"Upewnij się, że schemat został utworzony. "
+                                f"Szczegóły: {e}"
+                               )

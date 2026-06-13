@@ -16,7 +16,7 @@ RE_TRANSACTION_LINE = re.compile(r"""^
                                     (?P<qty>-?\d+)\| #Minus jest po to aby przy ujemnych wartościach nie zwracało błędu o niepoprawnym formacie, lecz o niepoprawnej ilości
                                     (?P<seller>[^|]+)\|
                                     (?P<region>[A-Z]{2})
-                                $""", re.VERBOSE | re.IGNORECASE)
+                                $""", re.VERBOSE | re.IGNORECASE) #tu zamiast re.IGNORECASE też można użyć re.I to jest to samo
 
 class SdfParseError(Exception):
     pass 
@@ -50,10 +50,14 @@ class FileProcessor:
                     if RE_SEPARATOR.match(line):
                         continue
 
-                    section_match = RE_SECTION.match(line)
+                    # match - match checks for a pattern only at the very beginning
+                    # finditer - scans through the entire string and returns an iterator of match objects (Highly memory-efficient for large texts)
+                    # search - zwraca pierwszy match który znajdzie
+
+                    section_match = RE_SECTION.match(line) 
 
                     if section_match:
-                        new_section = section_match.group("section")
+                        new_section = section_match.group("section") # da się łączyć grupy przez w tym przypadku section_match.sub(r'\2\3', jakiś_string)
 
                         if index >= len(expected_order):
                             raise SdfParseError(
@@ -143,18 +147,18 @@ class FileProcessor:
                         products[product_id] = product
 
                     elif (section == "#TRANSACTIONS"):
-                        parts = line.split("|")
-                        if len(parts) < 5:
-                            errors.append(f"Linia {line_number}: brakujące pole")
-                            continue
-                        elif len(parts) >5:
-                            errors.append(f"Linia {line_number}: zbyt wiele pól")
-                            continue
-                        
                         match_transaction = RE_TRANSACTION_LINE.match(line)
                         if not match_transaction:
-                            errors.append(f"Linia {line_number}: niepoprawny format transakcji")
-                            continue
+                            parts = line.split("|")
+                            if len(parts) < 5:
+                                errors.append(f"Linia {line_number}: brakujące pole")
+                                continue
+                            elif len(parts) >5:
+                                errors.append(f"Linia {line_number}: zbyt wiele pól")
+                                continue
+                            else: 
+                                errors.append(f"Linia {line_number}: niepoprawny format transakcji")
+                                continue
 
                         date = match_transaction.group("date")
                         product_id = match_transaction.group("pid")
